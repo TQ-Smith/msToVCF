@@ -3,13 +3,13 @@
 
 ## Building msToVCF
 
+The resulting executable will be in the **msToVCF/bin** directory.
+
 ```
 git clone https://github.com/TQ-Smith/msToVCF.git 
 cd msToVCF
 make
 ```
-
-The resulting executable will be in the **msToVCF/bin** directory.
 
 ## Options
 
