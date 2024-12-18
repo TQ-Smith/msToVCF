@@ -54,7 +54,7 @@ void print_help() {
     printf("   -p/--ploidy INT            Sets ploidy of samples. Default 2.\n");
     printf("   -l/--length INT            Sets length of segment in number of base pairs. Default 1,000,000.\n");
     printf("   -u/--unphased              If set, the phase is removed from genotypes.\n");
-    printf("   -m/--missing DOUBLE        Genotypes are missing with probability of 0 <= DOUBLE < 1. Default 0.\n");
+    printf("   -m/--missing DOUBLE        Genotypes are missing with supplied probability. Default 0.\n");
     printf("   -c/--compress              If set, the resulting files are gzipped compressed.\n");
     printf("\n");
 }
