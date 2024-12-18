@@ -23,6 +23,6 @@ Options:
    -p/--ploidy INT            Sets ploidy of samples. Default 2.
    -l/--length INT            Sets length of segment in number of base pairs. Default 1,000,000.
    -u/--unphased              If set, the phase is removed from genotypes.
-   -m/--missing DOUBLE        Genotypes are missing supplied probability. Default 0.
+   -m/--missing DOUBLE        Genotypes are missing with supplied probability. Default 0.
    -c/--compress              If set, the resulting files are compressed.
 ```
