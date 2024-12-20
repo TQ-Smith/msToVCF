@@ -14,7 +14,7 @@ make
 ## Optionss
 
 ```
-Usage: msToVCF [options]
+Usage: msToVCF [options] <infile.ms.gz>
 Options:
    --help                  Prints help menu and exits.
    --version               Prints version number and exits.
