@@ -11,7 +11,7 @@ cd msToVCF
 make
 ```
 
-## Optionss
+## Options
 
 ```
 Usage: msToVCF [options] <inFile.ms.gz>
