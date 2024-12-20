@@ -1,6 +1,8 @@
 
 # msToVCF v1.0
 
+Converts ms style output to VCF format.
+
 ## Building msToVCF
 
 The resulting executable will be in the **msToVCF/bin** directory.
