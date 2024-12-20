@@ -11,9 +11,7 @@ cd msToVCF
 make
 ```
 
-## Options
-
-msToVCF reads from **stdin**.
+## Optionss
 
 ```
 Usage: msToVCF [options]
