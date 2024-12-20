@@ -11,7 +11,7 @@ LFLAGS = -g -o
 
 bin/msToVCF: src/Main.o
 	mkdir -p bin
-	$(CC) $(LFLAGS) bin/msToVCF src/Main.o -lz
+	$(CC) $(LFLAGS) bin/msToVCF src/Main.o -lz -lm
 
 src/Main.o:
 	$(CC) $(CFLAGS) src/Main.c -o src/Main.o

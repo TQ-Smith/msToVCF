@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <math.h>
 #include "../lib/ketopt.h"
 #include "../lib/zlib.h"
 #include "../lib/kstring.h"
@@ -18,6 +19,9 @@
 // We use kseq to read in from stdin.
 #define BUFFER_SIZE 4096
 KSTREAM_INIT(gzFile, gzread, BUFFER_SIZE)
+
+// We want random floats between [0, 1).
+#define rand() ((float) rand() / (float) (RAND_MAX))
 
 // Prints ms replicate to VCF file.
 // Accepts:
@@ -32,68 +36,66 @@ KSTREAM_INIT(gzFile, gzread, BUFFER_SIZE)
 //  kvec_t(kstring_t*) samples -> The list of simulated samples.
 // Returns: void.
 void toVCF(char* fileName, int length, bool unphased, double missing, bool compress, int numReplicate, int numSegsites, int numSamples, kvec_t(double)* positions, kvec_t(kstring_t*)* samples) {
-
-    // Create the output file name.
-    kstring_t outputFileName;
+    // Create the output base name.
+    kstring_t* outputBase = calloc(1, sizeof(kstring_t));
     if (strncmp(fileName + strlen(fileName) - 3, ".ms", 3) == 0) {
-        kputsn(fileName, &outputFileName, strlen(fileName) - 3);
+        kputsn(fileName, strlen(fileName) - 3, outputBase);
     }
     if (strncmp(fileName + strlen(fileName) - 6, ".ms.gz", 6) == 0) {
-        kputsn(fileName, &outputFileName, strlen(fileName) - 6);
+        kputsn(fileName, strlen(fileName) - 6, outputBase);
     }
 
+    // I am repeating identical code here for fprintf/gzprint. I could have avoided this with a macro.
+
     // Write to the file
-    int prevPosition = 0, pos, leftGeno, rightGeno, temp;
+    int prevPosition = 0, pos;
+    char leftGeno, rightGeno, temp;
     if (!compress) {
-        kputs(sprintf("_rep%d.vcf", numReplicate), &outputFileName);
-        FILE* fp = open(outputFileName.s, "w");
+        // Create the output file name.
+        char outputFileName[strlen(outputBase -> s) + ((int) log10(numReplicate + 1.0) + 1) + 9];
+        sprintf(outputFileName, "%s_rep%d.vcf\0", outputBase -> s, numReplicate);
+        FILE* fp = fopen(outputFileName, "w");
+        // Print VCF header.
         fprintf(fp, "##fileformat=VCFv4.2\n");
         fprintf(fp, "##contig=<ID=chr1,length=%d>\n", length);
         fprintf(fp, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
+        // Print sample names in the header.
         for (int i = 0; i < numSamples / 2; i++) {
             fprintf(fp, "\ts%d", i);
         } 
         fprintf(fp, "\n");
+        // Process each record.
         for (int i = 0; i < numSegsites; i++) {
-            pos = kv_A(*positions, i);
-            if ((int) (pos * length) == prevPosition) {
-                pos += 1;
-            }
+            pos = (int) (kv_A(*positions, i) * length);
+            // Make sure the positions are unique.
+            if (pos == prevPosition) { pos += 1; }
             prevPosition = pos;
             fprintf(fp, "chr1\t%d\t.\tA\tT\t.\t.\t.\t.", pos);
             for (int j = 0; j < numSamples / 2; j++) {
                 leftGeno = kv_A(*samples, 2 * j) -> s[i];
                 rightGeno = kv_A(*samples, 2 * j + 1) -> s[i];
+                // If unphased, swap genotypes with 50% probability.
                 if (unphased) {
-                    if (rand() < 0.5) {
-                        temp = leftGeno;
-                        leftGeno = rightGeno;
-                        rightGeno = leftGeno;
-                    }
+                    if (rand() < 0.5) { temp = leftGeno; leftGeno = rightGeno; rightGeno = leftGeno; }
+                    // If missing probability is set, sprinkle missing genotypes.
                     if (missing > 0) {
-                        if (rand() < missing) fprintf(fp, "\t."); else fprintf(fp, "\t%d", leftGeno);
-                        if (rand() < missing) fprintf(fp, "/."); else fprintf(fp, "/%d", rightGeno);
-                    } else {
-                        fprintf(fp, "\t%d/%d", leftGeno, rightGeno);
-                    }
+                        if (rand() < missing) fprintf(fp, "\t."); else fprintf(fp, "\t%c", leftGeno);
+                        if (rand() < missing) fprintf(fp, "/."); else fprintf(fp, "/%c", rightGeno);
+                    } else { fprintf(fp, "\t%c/%c", leftGeno, rightGeno); }
                 } else {
                     if (missing > 0) {
-                        if (rand() < missing) fprintf(fp, "\t."); else fprintf(fp, "\t%d", leftGeno);
-                        if (rand() < missing) fprintf(fp, "|."); else fprintf(fp, "|%d", rightGeno);
-                    } else {
-                        fprintf(fp, "\t%d|%d", leftGeno, rightGeno);
-                    }
+                        if (rand() < missing) fprintf(fp, "\t."); else fprintf(fp, "\t%c", leftGeno);
+                        if (rand() < missing) fprintf(fp, "|."); else fprintf(fp, "|%c", rightGeno);
+                    } else { fprintf(fp, "\t%c|%c", leftGeno, rightGeno); }
                 }
             }
             fprintf(fp, "\n");
         }
         fclose(fp);
     } else {
-        kputs("_rep", &outputFileName);
-        ks_resize(&outputFileName, strlen(outputFileName.s) + ((int) log10(numReplicate) + 1));
-        snprintf(outputFileName.s, strlen(outputFileName.s), "%d", numReplicate);
-        kputs(".vcf.gz", &outputFileName);
-        gzFile fp = gzopen(outputFileName.s, "w");
+        char outputFileName[strlen(outputBase -> s) + ((int) log10(numReplicate + 1.0) + 1) + 12];
+        sprintf(outputFileName, "%s_rep%d.vcf.gz\0", outputBase -> s, numReplicate);
+        gzFile fp = gzopen(outputFileName, "w");
         gzprintf(fp, "##fileformat=VCFv4.2\n");
         gzprintf(fp, "##contig=<ID=chr1,length=%d>\n", length);
         gzprintf(fp, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
@@ -102,41 +104,31 @@ void toVCF(char* fileName, int length, bool unphased, double missing, bool compr
         } 
         gzprintf(fp, "\n");
         for (int i = 0; i < numSegsites; i++) {
-            pos = kv_A(*positions, i);
-            if ((int) (pos * length) == prevPosition) {
-                pos += 1;
-            }
+            pos = (int) (kv_A(*positions, i) * length);
+            if (pos == prevPosition) { pos += 1; }
             prevPosition = pos;
             gzprintf(fp, "chr1\t%d\t.\tA\tT\t.\t.\t.\t.", pos);
             for (int j = 0; j < numSamples / 2; j++) {
                 leftGeno = kv_A(*samples, 2 * j) -> s[i];
                 rightGeno = kv_A(*samples, 2 * j + 1) -> s[i];
                 if (unphased) {
-                    if (rand() < 0.5) {
-                        temp = leftGeno;
-                        leftGeno = rightGeno;
-                        rightGeno = leftGeno;
-                    }
+                    if (rand() < 0.5) { temp = leftGeno; leftGeno = rightGeno; rightGeno = leftGeno; }
                     if (missing > 0) {
-                        if (rand() < missing) gzprintf(fp, "\t."); else gzprintf(fp, "\t%d", leftGeno);
-                        if (rand() < missing) gzprintf(fp, "/."); else gzprintf(fp, "/%d", rightGeno);
-                    } else {
-                        gzprintf(fp, "\t%d/%d", leftGeno, rightGeno);
-                    }
+                        if (rand() < missing) gzprintf(fp, "\t."); else gzprintf(fp, "\t%c", leftGeno);
+                        if (rand() < missing) gzprintf(fp, "/."); else gzprintf(fp, "/%c", rightGeno);
+                    } else { gzprintf(fp, "\t%c/%c", leftGeno, rightGeno); }
                 } else {
                     if (missing > 0) {
-                        if (rand() < missing) gzprintf(fp, "\t."); else gzprintf(fp, "\t%d", leftGeno);
-                        if (rand() < missing) gzprintf(fp, "|."); else gzprintf(fp, "|%d", rightGeno);
-                    } else {
-                        gzprintf(fp, "\t%d|%d", leftGeno, rightGeno);
-                    }
+                        if (rand() < missing) gzprintf(fp, "\t."); else gzprintf(fp, "\t%c", leftGeno);
+                        if (rand() < missing) gzprintf(fp, "|."); else gzprintf(fp, "|%c", rightGeno);
+                    } else { gzprintf(fp, "\t%c|%c", leftGeno, rightGeno); }
                 }
             }
             gzprintf(fp, "\n");
         }
         gzclose(fp);
     }
-    free(outputFileName.s);
+    free(outputBase -> s); free(outputBase);
 }
 
 // Checks that user supplied options are valid.
@@ -167,26 +159,26 @@ void print_help() {
     printf("Written by T. Quinn Smith\n");
     printf("Principal Investigator: Zachary A. Szpiech\n");
     printf("The Pennsylvania State University\n\n");
-    printf("Usage: msToVCF <inFile.ms.gz> [options]\n");
+    printf("Usage: msToVCF [options] <inFile.ms.gz>\n");
     printf("Options:\n");
-    printf("   -h/--help                  Prints help menu and exits.\n");
-    printf("   -v/--version               Prints version number and exits.\n");
-    printf("   -l/--length INT            Sets length of segment in number of base pairs. Default 1,000,000.\n");
-    printf("   -u/--unphased              If set, the phase is removed from genotypes.\n");
-    printf("   -m/--missing DOUBLE        Genotypes are missing with supplied probability. Default 0.\n");
-    printf("   -c/--compress              If set, the resulting files are gzipped compressed.\n");
+    printf("   --help                  Prints help menu and exits.\n");
+    printf("   --version               Prints version number and exits.\n");
+    printf("   --length INT            Sets length of segment in number of base pairs. Default 1,000,000.\n");
+    printf("   --unphased              If set, the phase is removed from genotypes.\n");
+    printf("   --missing DOUBLE        Genotypes are missing with supplied probability. Default 0.\n");
+    printf("   --compress              If set, the resulting files are gzipped compressed.\n");
     printf("\n");
 }
 
 // Long options used for LODESTAR.
 static ko_longopt_t long_options[] = {
-    {"help",            ko_no_argument,         'h'},
-    {"version",         ko_no_argument,         'v'},
-    {"length",          ko_required_argument,   'l'},
-    {"unphased",        ko_no_argument,         'u'},
-    {"missing",         ko_required_argument,   'm'},
-    {"compress",        ko_no_argument,         'c'},
-    {0, 0, 0}
+    {"help",            ko_no_argument,         300},
+    {"version",         ko_no_argument,         301},
+    {"length",          ko_required_argument,   302},
+    {"unphased",        ko_no_argument,         303},
+    {"missing",         ko_required_argument,   304},
+    {"compress",        ko_no_argument,         305},
+    {NULL, 0, 0}
 };
 
 int main(int argc, char *argv[]) {
@@ -195,26 +187,11 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     // Single character aliases for long options.
-    const char *opt_str = "h:v:l:u:m:c";
     ketopt_t options = KETOPT_INIT;
     int c;    
 
     // File name is the first argument.
-    char* fileName = argv[1];
-    argv += 2;
-
-    // Pass through options. Check for options requiring an argument that were not given one.
-    //  Also, check if any options are supplied that are not defined. If user supplies the help
-    //  argument, print help menu and exit, likewise for version.
-    while ((c = ketopt(&options, argc, argv, 1, opt_str, long_options)) >= 0) {
-        switch (c) {
-            case ':': printf("Error! Option %s is missing an argument! Exiting ...\n", argv[options.i - 1]); return 1;
-            case '?': printf("Error! \"%s\" is unknown! Exiting ...\n", argv[options.i - 1]); return 1;
-            case 'h': print_help(); return 0;
-            case 'v': printf("Version 1.0 December 2024.\n"); return 0;
-        }
-	}
-	options = KETOPT_INIT;
+    char* fileName = argv[argc - 1];
 
     // Set default option values.
     int length = 1000000;
@@ -222,14 +199,18 @@ int main(int argc, char *argv[]) {
     double missing = 0;
     bool compress = false;
 
-    // Parse command line arguments.
-    while ((c = ketopt(&options, argc, argv, 1, opt_str, long_options)) >= 0) {
-        switch (c) {
-            case 'l': length = (int) strtol(options.arg, (char**) NULL, 10); break;
-            case 'u': unphased = true; break;
-            case 'm': missing = strtod(options.arg, (char**) NULL); break;
-            case 'c': compress = true; break;
-        }
+    // Pass through options. Check for options requiring an argument that were not given one.
+    //  Also, check if any options are supplied that are not defined. If user supplies the help
+    //  argument, print help menu and exit, likewise for version.
+    while ((c = ketopt(&options, argc, argv, 1, ":", long_options)) >= 0) {
+        if (c == 300) { print_help(); return 0; }
+        if (c == 301) { printf("Version 1.0 December 2024.\n"); return 0; }
+        if (c == 302) { length = (int) strtol(options.arg, (char**) NULL, 10); }
+        if (c == 303) { unphased = true; }
+        if (c == 304) { missing = strtod(options.arg, (char**) NULL); }
+        if (c == 305) { compress = true; }
+        if (c == ':') { printf("Error! Option %s is missing an argument! Exiting ...\n", argv[options.i - 1]); return 1; }
+        if (c == '?') { printf("Error! \"%s\" is unknown! Exiting ...\n", argv[options.i - 1]); return 1; }
 	}
     
     // Check configuration. If invalid argument, exit program.
