@@ -161,37 +161,28 @@ void print_help() {
     printf("The Pennsylvania State University\n\n");
     printf("Usage: msToVCF [options] <inFile.ms.gz>\n");
     printf("Options:\n");
-    printf("   --help                  Prints help menu and exits.\n");
-    printf("   --version               Prints version number and exits.\n");
-    printf("   --length INT            Sets length of segment in number of base pairs. Default 1,000,000.\n");
-    printf("   --unphased              If set, the phase is removed from genotypes.\n");
-    printf("   --missing DOUBLE        Genotypes are missing with supplied probability. Default 0.\n");
-    printf("   --compress              If set, the resulting files are gzipped compressed.\n");
+    printf("   -l INT           Sets length of segment in number of base pairs. Default 1,000,000.\n");
+    printf("   -u               If set, the phase is removed from genotypes.\n");
+    printf("   -m DOUBLE        Genotypes are missing with supplied probability. Default 0.\n");
+    printf("   -c               If set, the resulting files are gzipped compressed.\n");
     printf("\n");
 }
 
-// Long options used for LODESTAR.
 static ko_longopt_t long_options[] = {
-    {"help",            ko_no_argument,         300},
-    {"version",         ko_no_argument,         301},
-    {"length",          ko_required_argument,   302},
-    {"unphased",        ko_no_argument,         303},
-    {"missing",         ko_required_argument,   304},
-    {"compress",        ko_no_argument,         305},
     {NULL, 0, 0}
 };
 
 int main(int argc, char *argv[]) {
 
-    // Seed random number generator.
-    srand(time(NULL));
+    // If no options given, print help menu.
+    if (argc == 1) {
+        print_help();
+        return 0;
+    }
 
     // Single character aliases for long options.
     ketopt_t options = KETOPT_INIT;
-    int c;    
-
-    // File name is the first argument.
-    char* fileName = argv[argc - 1];
+    int c;
 
     // Set default option values.
     int length = 1000000;
@@ -199,20 +190,24 @@ int main(int argc, char *argv[]) {
     double missing = 0;
     bool compress = false;
 
-    // Pass through options. Check for options requiring an argument that were not given one.
-    //  Also, check if any options are supplied that are not defined. If user supplies the help
-    //  argument, print help menu and exit, likewise for version.
-    while ((c = ketopt(&options, argc, argv, 1, ":", long_options)) >= 0) {
-        if (c == 300) { print_help(); return 0; }
-        if (c == 301) { printf("Version 1.0 December 2024.\n"); return 0; }
-        if (c == 302) { length = (int) strtol(options.arg, (char**) NULL, 10); }
-        if (c == 303) { unphased = true; }
-        if (c == 304) { missing = strtod(options.arg, (char**) NULL); }
-        if (c == 305) { compress = true; }
-        if (c == ':') { printf("Error! Option %s is missing an argument! Exiting ...\n", argv[options.i - 1]); return 1; }
-        if (c == '?') { printf("Error! \"%s\" is unknown! Exiting ...\n", argv[options.i - 1]); return 1; }
+    while ((c = ketopt(&options, argc, argv, 1, "l:u:m:c:", long_options)) >= 0) {
+		if (c == 'l') length = atoi(options.arg);
+		else if (c == 'u') unphased = true;
+		else if (c == 'm') missing = atof(options.arg);
+        else if (c == 'c') compress = true;
+        else { printf("Unknow option %s. Exiting!\n", argv[options.i]); return 1;}
 	}
-    
+
+    // Get file name.
+    char* fileName = argv[options.ind];
+
+    // Seed random number generator.
+    srand(time(NULL));
+
+    printf("%d\n", length);
+    printf("%d\n", unphased);
+    printf("%lf\n", missing);
+    printf("%d\n", compress);
     // Check configuration. If invalid argument, exit program.
     if (check_configuration(length, missing) != 0) {
         printf("Exiting!\n");
