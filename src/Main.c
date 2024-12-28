@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
     double missing = 0;
     bool compress = false;
 
-    while ((c = ketopt(&options, argc, argv, 1, "l:u:m:c:", long_options)) >= 0) {
+    while ((c = ketopt(&options, argc, argv, 1, "l:um:c", long_options)) >= 0) {
 		if (c == 'l') length = atoi(options.arg);
 		else if (c == 'u') unphased = true;
 		else if (c == 'm') missing = atof(options.arg);
