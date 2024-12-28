@@ -204,10 +204,6 @@ int main(int argc, char *argv[]) {
     // Seed random number generator.
     srand(time(NULL));
 
-    printf("%d\n", length);
-    printf("%d\n", unphased);
-    printf("%lf\n", missing);
-    printf("%d\n", compress);
     // Check configuration. If invalid argument, exit program.
     if (check_configuration(length, missing) != 0) {
         printf("Exiting!\n");
